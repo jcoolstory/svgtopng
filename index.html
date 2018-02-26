@@ -1,0 +1,131 @@
+<html ng-app="svgtopng">
+<script src="angular.min.js"></script>
+<script type="text/javascript" src="jszip.min.js"></script>
+<script type="text/javascript" src="FileSaver.js"></script>
+
+<script>
+var app = angular.module("svgtopng",[])
+
+app.controller("mainCtrl",function($scope){
+	$scope.files = [];
+	$scope.cwidth = 512;
+	$scope.cheight= 512;
+	$scope.fillColor = "#000000";
+	var zip = new JSZip();
+	function dataURLtoBlob(dataurl) {
+    var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+        bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], {type:mime});
+}
+
+	var loadcallback = function(file){			
+			var reader = new FileReader();
+			reader.onload = function(){
+				
+				var view = document.getElementById("view")				
+				view.innerHTML = reader.result;
+				var temp = view.firstChild
+				
+				temp.setAttribute('height',$scope.cwidth);
+				temp.setAttribute('width',$scope.cheight);
+				temp.setAttribute('fill',$scope.fillColor);
+				var xml  = new XMLSerializer().serializeToString(temp);
+				var img  = new Image();
+
+				img.onload = function(){
+					var canvas = document.createElement('canvas');
+					canvas.width = img.width;
+					canvas.height = img.height;
+
+					var context = canvas.getContext('2d');
+					context.drawImage(img, 0, 0);
+
+					var a = document.createElement('a')
+					a.href=canvas.toDataURL('image/png');
+					a.download = file.name+".png";
+					a.innerHTML = "download";
+
+					file.link = {
+						checked:true,
+						dataUrl:a.href,
+						name:a.download
+					}
+					var el = document.getElementById(file.$$hashKey+file.name)
+					el.appendChild(a)
+					delete(canvas)
+				} 
+
+				data = "data:image/svg+xml;base64," + btoa(xml),
+				img.setAttribute('src', data)
+			}
+			reader.readAsText(file)
+	}
+	$scope.loadimage = function(){
+		var files = $scope.files;
+		
+		for (var i = 0 ; i < files.length;i++)
+		{
+			loadcallback(files[i])
+		}
+	}
+	$scope.zipname = "down.zip"
+	$scope.download = function(){
+		var files = $scope.files;
+		for(var i = 0 ; i<files.length ; i++){
+			console.log(files[i].link)
+			var blob = dataURLtoBlob(files[i].link.dataUrl);
+			zip.file(files[i].link.name,blob)
+		}
+		promise = zip.generateAsync({type:"blob"}).then(function (blob) {
+		    saveAs(blob, $scope.zipname);
+		});
+	}
+	$scope.$on('dropfiles', function(scope,files){
+		zip = new JSZip();
+		$scope.files = files;
+		$scope.$apply();
+	})
+})
+</script>
+<body  ng-controller='mainCtrl'>
+<div>
+<label>Fill Color</label> <input type="text" ng-model="fillColor">
+<label>Width</label> <input type="text" ng-model="cwidth">
+<label>Height</label> <input type="text" ng-model="cheight">
+<label>Zip Name</label><input type="text" ng-model="zipname">
+</div>
+<div style="border:1px solid black;width:500;height:500;display: none;" draggable="true" id="dropzone">
+<div id='view' style="display: none;"></div>
+</div>
+<button ng-click="loadimage()">Convert</button>
+<button ng-click="download()">Download</button>
+<ul>
+<li ng-repeat="file in files">
+	<div id={{file.$$hashKey+file.name}}>{{file.name}} </a></div>
+</li>
+</ul>
+</body>
+<script>
+var temp= ""
+ function handleImageDrop(evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
+    el =  document.getElementById("dropzone")
+    var files = evt.dataTransfer.files;
+	$scope = angular.element(el).scope()
+	$scope.$emit("dropfiles",files)
+  }
+
+  function handleDragOver(evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
+    evt.dataTransfer.dropEffect = 'copy';
+  }
+  
+  document.addEventListener('dragover', handleDragOver, false);
+  document.addEventListener('drop', handleImageDrop, false);
+</script>
+</html>
